@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Industry &amp; CSR Marketplace — UI Preview (static demo)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .pop { animation: pop 0.18s ease-out; }
+  .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+</style>
+</head>
+<body class="bg-slate-100">
+
+<!-- =====================================================================
+     Static UI preview of frontend/app/industry/marketplace/page.tsx
+     Same marketplace: metrics strip, filters (domain / tech stack /
+     funding & mentorship status), solution cards, and the pledge modal
+     (grant / mentorship / pilot). No network calls — data is mocked.
+     ===================================================================== -->
+
+<div id="app" class="min-h-screen bg-slate-100">
+
+  <!-- ============ header ============ -->
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto w-full max-w-6xl px-4 py-4">
+      <p class="text-xs font-semibold uppercase tracking-widest text-indigo-700">Module 5 · Industry &amp; CSR Partnership</p>
+      <h1 class="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">Innovation Funding Marketplace</h1>
+      <p class="mx-auto mt-2 max-w-2xl text-sm text-slate-500">
+        Browse govt-validated student &amp; NGO prototypes from Jharkhand and pledge
+        financial grants, technical mentorship, or pilot deployment infrastructure —
+        every commitment is routed to the team and the state admin command center.
+      </p>
+    </div>
+  </header>
+
+  <!-- demo-only controls (removed in the real app) -->
+  <div class="border-b border-indigo-100 bg-indigo-50">
+    <div class="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-1.5 text-[11px] font-medium text-indigo-700">
+      <span>Static UI preview — no backend (data is mocked like <code class="font-mono">GET /api/industry/partnerships</code>).</span>
+      <span class="flex flex-wrap items-center gap-1.5">
+        Signed in as:
+        <select id="accountSelect" class="rounded-lg border border-indigo-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-indigo-800">
+          <option value="2">pid=2 · Tata Chemicals Foundation (CSR)</option>
+          <option value="3">pid=3 · AgriStack Labs (Startup)</option>
+          <option value="4">pid=4 · Ranchi Metal Works (MSME)</option>
+        </select>
+        <button onclick="resetDemo()" class="rounded-lg bg-indigo-100 px-2 py-0.5 font-semibold underline underline-offset-2 hover:bg-indigo-200">↺ reset</button>
+      </span>
+    </div>
+  </div>
+
+  <main class="mx-auto w-full max-w-6xl px-4 py-6">
+    <!-- ============ impact metrics strip ============ -->
+    <section id="metricsRow" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></section>
+    <p class="mt-2 text-center text-[11px] text-slate-400">
+      These corporate engagement metrics feed the state administrator impact dashboard.
+    </p>
+
+    <!-- ============ filters ============ -->
+    <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div id="categoryChips" class="flex flex-wrap items-center gap-1.5"></div>
+          <p class="text-xs font-medium text-slate-400" id="showingLine"></p>
+        </div>
+        <div class="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+          <input id="searchInput" type="search" oninput="onFilterChange()" placeholder="Search title, problem, team, or technology…"
+                 class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100" />
+          <select id="techSelect" onchange="onFilterChange()" aria-label="Filter by tech stack"
+                  class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+            <option value="all">All tech stacks</option>
+          </select>
+          <select id="supportSelect" onchange="onFilterChange()" aria-label="Filter by funding or mentorship status"
+                  class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:w-auto">
+            <option value="all">All solutions</option>
+            <option value="open">Open for backing</option>
+            <option value="backed">Has active pledges</option>
+            <option value="grant">💰 Has a grant</option>
+            <option value="mentorship">🧭 Has mentorship</option>
+            <option value="pilot">🚀 Has a pilot</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ catalog grid / empty state ============ -->
+    <section id="catalogGrid" class="mt-6 grid gap-4 md:grid-cols-2"></section>
+    <section id="emptyState" class="mx-auto mt-10 hidden max-w-lg rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+      <p class="text-4xl">🔎</p>
+      <h2 class="mt-2 text-sm font-bold text-slate-700">No solutions match these filters</h2>
+      <p class="mt-1 text-sm text-slate-500">Try clearing the tech stack, domain, or support-state filter.</p>
+      <button onclick="clearFilters()" class="mt-4 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700">Clear all filters</button>
+    </section>
+  </main>
+</div>
+
+<!-- ============ pledge modal ============ -->
+<div id="modal" class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-900/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+  <div class="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl no-scrollbar">
+
+    <!-- success state -->
+    <div id="modalSuccess" class="hidden py-6 text-center">
+      <p class="text-4xl">🤝</p>
+      <h3 class="mt-3 text-lg font-bold text-slate-900">Pledge recorded!</h3>
+      <p class="mx-auto mt-2 max-w-sm text-sm text-slate-500" id="successText"></p>
+      <div class="mx-auto mt-4 inline-block rounded-full bg-slate-100 px-4 py-1.5 font-mono text-xs text-slate-600" id="successId"></div>
+      <button onclick="closeModal(true)" class="mt-6 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">Back to marketplace</button>
+    </div>
+
+    <!-- form state -->
+    <div id="modalForm">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-[11px] font-semibold uppercase tracking-widest text-indigo-600">Partnership pledge</p>
+          <h3 id="modalSolutionTitle" class="mt-0.5 truncate text-base font-bold text-slate-900"></h3>
+          <p id="modalSolutionTeam" class="text-xs text-slate-500"></p>
+        </div>
+        <button type="button" onclick="closeModal(false)" aria-label="Close" class="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">✕</button>
+      </div>
+
+      <div class="mt-4">
+        <p class="text-xs font-semibold text-slate-700">Type of commitment</p>
+        <div id="typeButtons" class="mt-2 grid grid-cols-3 gap-2"></div>
+        <p class="mt-1.5 text-[11px] text-slate-400" id="typeHint"></p>
+      </div>
+
+      <div class="mt-4 space-y-3">
+        <div>
+          <label class="flex items-center justify-between text-xs font-semibold text-slate-700">
+            <span id="amountLabel">Grant amount (₹)<span class="ml-0.5 text-rose-500">*</span></span>
+            <span class="font-normal text-slate-400" id="amountSub"></span>
+          </label>
+          <div class="relative mt-1.5">
+            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">₹</span>
+            <input id="amountInput" type="number" min="1" step="0.01" placeholder="e.g. 250000"
+                   class="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          </div>
+          <p class="mt-1 hidden text-xs text-rose-600" id="amountError"></p>
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-700">Commitment headline <span class="text-rose-500">*</span></label>
+          <input id="titleInput" type="text" maxlength="200" placeholder="e.g. ₹2.5L seed grant + lab access for field testing"
+                 class="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+          <p class="mt-1 hidden text-xs text-rose-600" id="titleError"></p>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-700">Formal commitment <span class="text-rose-500">*</span></label>
+            <span class="text-[11px] text-slate-400" id="descCounter">0/20+ chars</span>
+          </div>
+          <textarea id="descInput" rows="4" placeholder="Outline what your organisation will provide — funds, expert hours, equipment, pilot site, success metrics, and the timeline under the partnership."
+                    oninput="updateDescCounter()"
+                    class="mt-1.5 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></textarea>
+          <p class="mt-1 hidden text-xs text-rose-600" id="descError"></p>
+        </div>
+
+        <!-- ---------- point-of-contact ---------- -->
+        <div class="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3">
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-xs font-semibold text-slate-700">Contact details</p>
+            <span class="text-[11px] text-slate-400">shared with the team &amp; govt reviewers for matching</span>
+          </div>
+          <div class="mt-2 grid gap-2 sm:grid-cols-2">
+            <div>
+              <input id="contactEmailInput" type="email" placeholder="contact@company.in" aria-label="Contact email"
+                     class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+              <p class="mt-1 text-[11px] text-slate-400">Email <span class="text-rose-500">*</span></p>
+              <p class="mt-1 hidden text-xs text-rose-600" id="contactEmailError"></p>
+            </div>
+            <div>
+              <input id="contactPhoneInput" type="tel" placeholder="+91 98765 43210" aria-label="Contact phone"
+                     class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none placeholder:text-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+              <p class="mt-1 text-[11px] text-slate-400">Phone (optional)</p>
+              <p class="mt-1 hidden text-xs text-rose-600" id="contactPhoneError"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="mt-3 hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700" id="serverError"></p>
+
+      <div class="mt-5 flex gap-2">
+        <button onclick="closeModal(false)" class="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">Cancel</button>
+        <button onclick="submitPledge()" id="submitBtn" class="flex-[2] rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99]">Submit formal pledge</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+ * Static UI preview — mock of GET/POST /api/industry/partnerships.
+ * ===================================================================== */
+
+var CATEGORY_ORDER = ['AGR', 'WAT', 'HLT', 'EDU', 'PWR', 'INF', 'SWM', 'OTH'];
+var CATEGORY_META = {
+  AGR: { label: 'Agriculture',  classes: 'bg-lime-100 text-lime-800 ring-lime-200', dot: 'bg-lime-500' },
+  WAT: { label: 'Water & Sanitation', classes: 'bg-sky-100 text-sky-800 ring-sky-200', dot: 'bg-sky-500' },
+  HLT: { label: 'Health', classes: 'bg-rose-100 text-rose-800 ring-rose-200', dot: 'bg-rose-500' },
+  EDU: { label: 'Education', classes: 'bg-amber-100 text-amber-800 ring-amber-200', dot: 'bg-amber-500' },
+  PWR: { label: 'Power & Energy', classes: 'bg-yellow-100 text-yellow-800 ring-yellow-200', dot: 'bg-yellow-500' },
+  INF: { label: 'Infrastructure', classes: 'bg-indigo-100 text-indigo-800 ring-indigo-200', dot: 'bg-indigo-500' },
+  SWM: { label: 'Waste Mgmt', classes: 'bg-teal-100 text-teal-800 ring-teal-200', dot: 'bg-teal-500' },
+  OTH: { label: 'Other', classes: 'bg-slate-200 text-slate-700 ring-slate-300', dot: 'bg-slate-400' }
+};
+var PLEDGE_META = {
+  grant:     { label: 'Financial grant',       short: 'grant',       icon: '💰', hint: 'Committed funding (INR) to build and scale the prototype.' },
+  mentorship:{ label: 'Technical mentorship',  short: 'mentorship',  icon: '🧭', hint: 'Engineers, domain experts, and guided technical support.' },
+  pilot:     { label: 'Pilot deployment',      short: 'pilot',       icon: '🚀', hint: 'Infrastructure & a real deployment site for field validation.' }
+};
+
+/* Accounts mirror the React page's demo ids: csr=2, startup=3, msme=4 */
+var ACCOUNTS = {
+  '2': { type: 'csr',     label: 'Tata Chemicals Foundation' },
+  '3': { type: 'startup', label: 'AgriStack Labs' },
+  '4': { type: 'msme',    label: 'Ranchi Metal Works' }
+};
+
+var nextPledgeId = 10;
+var solutions = [
+  {
+    solutionId: 101, iteration: 2, title: 'IoT Water-Quality Sentinel for Hand Pumps',
+    summary: 'Low-power sensor raft that mounts on community hand pumps and streams turbidity, pH and residual chlorine over LoRaWAN, with an SMS alert to the ward pump operator when contamination spikes.',
+    techStack: ['ESP32', 'LoRaWAN', 'Python', 'PostgreSQL', 'pgvector'],
+    complaint: { id: 31, title: 'Borewell water turns brown after monsoon rains', district: 'Gumla', categoryCode: 'WAT', categoryName: 'Water & Sanitation' },
+    team: { teamName: 'Team JalSetu', institutionName: 'NIT Jamshedpur', teamLeadName: 'Priya K.' },
+    submittedAt: '2026-08-12T09:20:00Z',
+    repositoryUrl: 'https://github.com/example/jalsetu', prototypeUrl: 'https://demo.example/jalsetu',
+    pledges: []
+  },
+  {
+    solutionId: 102, iteration: 1, title: 'Kisan Sathi — Vernacular Advisory Chatbot',
+    summary: 'Bhashini-integrated voice assistant that answers MSP, sowing-window and pest queries in Sadri and Hindi, trained on Jharkhand agriculture advisories and routed to block extension officers for escalation.',
+    techStack: ['Next.js', 'FastAPI', 'Bhashini', 'Sentence-BERT'],
+    complaint: { id: 12, title: 'Paddy crop pest outbreak — farmers need guidance', district: 'Bokaro', categoryCode: 'AGR', categoryName: 'Agriculture & Farmer Welfare' },
+    team: { teamName: 'KrishiMitra', institutionName: 'Birsa Agricultural University', teamLeadName: 'Amit R.' },
+    submittedAt: '2026-08-03T14:05:00Z',
+    repositoryUrl: 'https://github.com/example/kisan-sathi', prototypeUrl: 'https://demo.example/kisan-sathi',
+    pledges: []
+  },
+  {
+    solutionId: 103, iteration: 1, title: 'Smart Anganwadi Attendance & Nutrition Tracker',
+    summary: 'Offline-first tablet app for Anganwadi workers to record daily attendance and take-home rations, generating district-level nutrition dashboards for ICDS supervisors.',
+    techStack: ['React Native', 'PWA', 'PostgreSQL'],
+    complaint: { id: 44, title: 'Anganwadi centre has no attendance records', district: 'Hazaribagh', categoryCode: 'EDU', categoryName: 'Education & Skill Development' },
+    team: { teamName: 'Team Poshan', institutionName: 'XISS Ranchi', teamLeadName: 'Neha S.' },
+    submittedAt: '2026-07-28T11:40:00Z',
+    repositoryUrl: 'https://github.com/example/poshan-tracker', prototypeUrl: null,
+    pledges: []
+  },
+  {
+    solutionId: 104, iteration: 3, title: 'Solar Microgrid Health Monitor for Village Clinics',
+    summary: 'Retrofit controller that tracks battery health, inverter load and clinic uptime across off-grid solar systems, dispatching maintenance tickets before outages hit cold-chain storage.',
+    techStack: ['Arduino', 'Node.js', 'MQTT', 'Grafana'],
+    complaint: { id: 57, title: 'Clinic power fails during the night, vaccines at risk', district: 'Latehar', categoryCode: 'PWR', categoryName: 'Power & Energy' },
+    team: { teamName: 'Team Urja', institutionName: 'IIT (ISM) Dhanbad', teamLeadName: 'Rohit V.' },
+    submittedAt: '2026-07-15T08:10:00Z',
+    repositoryUrl: 'https://github.com/example/urja-monitor', prototypeUrl: 'https://demo.example/urja',
+    pledges: []
+  },
+  {
+    solutionId: 105, iteration: 1, title: 'Digital Docket for Pothole-to-Contract Closure',
+    summary: 'Geo-tagged photo documentation pipeline that lets junior engineers log pothole repairs from inspection to contractor payment, with an audit trail visible to citizens on the SIH platform.',
+    techStack: ['Next.js', 'Leaflet', 'PostgreSQL', 'pgvector'],
+    complaint: { id: 71, title: 'NH stretch potholes reported thrice, no repair', district: 'Ranchi', categoryCode: 'INF', categoryName: 'Infrastructure & Roads' },
+    team: { teamName: 'Team SadakSetu', institutionName: 'Amity Ranchi', teamLeadName: 'Sana M.' },
+    submittedAt: '2026-06-30T16:00:00Z',
+    repositoryUrl: 'https://github.com/example/sadaksetu', prototypeUrl: null,
+    pledges: []
+  },
+  {
+    solutionId: 106, iteration: 2, title: 'Route Planner for Decentralised Waste Collection',
+    summary: 'Community-bin level ML routing for the ward garbage vans, optimising fuel spend while closing the loop on every SWM complaint with photographic proof of pickup.',
+    techStack: ['Python', 'FastAPI', 'OR-Tools', 'Flutter'],
+    complaint: { id: 9, title: 'Garbage van skips lane every alternate week', district: 'Jamshedpur', categoryCode: 'SWM', categoryName: 'Waste Management' },
+    team: { teamName: 'Team SwachhPath', institutionName: 'XLRI Jamshedpur', teamLeadName: 'Kabir D.' },
+    submittedAt: '2026-06-18T10:30:00Z',
+    repositoryUrl: 'https://github.com/example/swachhpath', prototypeUrl: 'https://demo.example/swachhpath',
+    pledges: []
+  }
+];
+
+/* Seed a couple of pledges from other partners so the metrics look alive. */
+solutions[0].pledges.push({ id: 1, partnerId: '3', partnerLabel: 'AgriStack Labs', partnerType: 'startup', pledgeType: 'mentorship', amountInr: null, status: 'active', createdAt: '2026-08-20' });
+solutions[3].pledges.push({ id: 2, partnerId: '2', partnerLabel: 'Tata Chemicals Foundation', partnerType: 'csr', pledgeType: 'grant', amountInr: 450000, status: 'active', createdAt: '2026-08-01' });
+
+var state = {
+  accountId: '2',
+  category: 'all',
+  support: 'all',
+  tech: 'all',
+  search: '',
+  modalFor: null,
+  pledgeType: 'grant'
+};
+
+/* ---------- helpers ---------- */
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function fmtINR(n) {
+  try {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+  } catch (e) { return '\u20B9' + Number(n).toLocaleString('en-IN'); }
+}
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch (e) { return iso; }
+}
+function catMeta(code) { return CATEGORY_META[code] || CATEGORY_META.OTH; }
+function account() { return ACCOUNTS[state.accountId] || ACCOUNTS['2']; }
+
+/* ---------- metrics ---------- */
+function metrics() {
+  var committed = 0, total = 0, active = 0, partners = {}, byType = { grant: 0, mentorship: 0, pilot: 0 },
+      byPartnerType = { csr: 0, startup: 0, msme: 0 }, backed = {};
+  solutions.forEach(function (s) {
+    s.pledges.forEach(function (p) {
+      if (p.status === 'declined' || p.status === 'withdrawn') return;
+      total++; active += (p.status === 'active' || p.status === 'matched') ? 1 : 0;
+      committed += Number(p.amountInr) || 0;
+      partners[p.partnerId] = true;
+      backed[s.solutionId] = true;
+      byType[p.pledgeType] = (byType[p.pledgeType] || 0) + 1;
+      byPartnerType[p.partnerType] = (byPartnerType[p.partnerType] || 0) + 1;
+    });
+  });
+  return {
+    totalPledges: total, activePledges: active, committedInr: committed,
+    partners: Object.keys(partners).length, backedSolutions: Object.keys(backed).length,
+    byType: byType, byPartnerType: byPartnerType
+  };
+}
+
+/* ---------- render ---------- */
+function renderMetrics() {
+  var m = metrics();
+  var tiles = [
+    { label: 'Committed funding', value: fmtINR(m.committedInr), sub: 'across ' + m.totalPledges + ' pledge' + (m.totalPledges === 1 ? '' : 's') },
+    { label: 'Active pledges', value: m.activePledges, sub: m.backedSolutions + ' solution' + (m.backedSolutions === 1 ? '' : 's') + ' backed' },
+    { label: 'Corporate partners', value: m.partners, sub: m.byPartnerType.csr + ' CSR · ' + m.byPartnerType.startup + ' startup · ' + m.byPartnerType.msme + ' MSME' },
+    null
+  ];
+  var html = '';
+  tiles.forEach(function (t) {
+    if (!t) {
+      html += '<div class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">'
+        + '<p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Pledges by type</p>'
+        + '<div class="mt-1.5 space-y-1 text-xs font-medium text-slate-700">'
+        + '<p>\uD83D\uDCB0 ' + m.byType.grant + ' financial grant' + (m.byType.grant === 1 ? '' : 's') + '</p>'
+        + '<p>\uD83E\uDDED ' + m.byType.mentorship + ' mentorship' + (m.byType.mentorship === 1 ? '' : 's') + '</p>'
+        + '<p>\uD83D\uDE80 ' + m.byType.pilot + ' pilot' + (m.byType.pilot === 1 ? '' : 's') + '</p>'
+        + '</div></div>';
+    } else {
+      html += '<div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">'
+        + '<p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + esc(t.label) + '</p>'
+        + '<p class="mt-1 text-xl font-bold text-slate-900">' + t.value + '</p>'
+        + '<p class="text-[11px] text-slate-400">' + esc(t.sub) + '</p></div>';
+    }
+  });
+  document.getElementById('metricsRow').innerHTML = html;
+}
+
+function renderCategoryChips() {
+  var counts = {};
+  solutions.forEach(function (s) {
+    counts[s.complaint.categoryCode] = (counts[s.complaint.categoryCode] || 0) + 1;
+  });
+  var html = '';
+  html += '<button type="button" data-cat="all" class="rounded-full px-3 py-1.5 text-xs font-semibold transition ' + (state.category === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200') + '">All domains</button>';
+  CATEGORY_ORDER.forEach(function (code) {
+    if (!counts[code]) return;
+    var meta = catMeta(code);
+    var active = state.category === code;
+    var cls = active ? meta.classes + ' ring-2 ring-current' : 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+    html += '<button type="button" data-cat="' + code + '" class="rounded-full px-3 py-1.5 text-xs font-semibold transition ' + cls + '">'
+      + '<span class="mr-1.5 inline-block h-1.5 w-1.5 rounded-full ' + meta.dot + '"></span>' + meta.label + ' · ' + counts[code] + '</button>';
+  });
+  document.getElementById('categoryChips').innerHTML = html;
+  document.getElementById('categoryChips').querySelectorAll('button[data-cat]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var val = btn.getAttribute('data-cat');
+      state.category = (val === 'all' || state.category === val) ? 'all' : val;
+      renderCategoryChips();
+      renderCatalog();
+    });
+  });
+}
+function chip(value, label, active, activeCls, idleCls, dot) {
+  var cls = active ? (activeCls || 'bg-slate-900 text-white') : (idleCls || 'bg-slate-100 text-slate-600');
+  return '<button type="button" data-chip="' + value + '" class="rounded-full px-3 py-1.5 text-xs font-semibold transition ' + cls + '">' + esc(label) + '</button>';
+}
+
+function renderTechOptions() {
+  var seen = [];
+  solutions.forEach(function (s) { s.techStack.forEach(function (t) { if (seen.indexOf(t) === -1) seen.push(t); }); });
+  seen.sort();
+  var html = '<option value="all">All tech stacks</option>';
+  seen.forEach(function (t) {
+    html += '<option value="' + esc(t) + '"' + (state.tech === t ? ' selected' : '') + '>' + esc(t) + '</option>';
+  });
+  document.getElementById('techSelect').innerHTML = html;
+}
+
+function filtered() {
+  var q = state.search.trim().toLowerCase();
+  return solutions.filter(function (s) {
+    if (state.category !== 'all' && s.complaint.categoryCode !== state.category) return false;
+    if (state.support === 'open' && s.pledges.length > 0) return false;
+    if (state.support === 'backed' && s.pledges.length === 0) return false;
+    if (state.support === 'grant' && !s.pledges.some(function (p) { return p.pledgeType === 'grant'; })) return false;
+    if (state.support === 'mentorship' && !s.pledges.some(function (p) { return p.pledgeType === 'mentorship'; })) return false;
+    if (state.support === 'pilot' && !s.pledges.some(function (p) { return p.pledgeType === 'pilot'; })) return false;
+    if (state.tech !== 'all' && s.techStack.indexOf(state.tech) === -1) return false;
+    if (q) {
+      var hay = [s.title, s.summary, s.complaint.title, s.team.teamName, s.team.institutionName, s.techStack.join(' ')].join(' ').toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+}
+
+function committedPledges(s) {
+  return s.pledges.filter(function (p) { return p.status !== 'declined' && p.status !== 'withdrawn'; });
+}
+
+function pledgeBadge(s) {
+  var list = committedPledges(s);
+  var mine = list.filter(function (p) { return p.partnerId === state.accountId; });
+  if (list.length === 0) {
+    return '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2">'
+      + '<p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Open for partnership</p>'
+      + '<p class="mt-0.5 text-xs text-slate-500">Seeking grants, mentorship &amp; pilot support</p></div>';
+  }
+  var anyActive = list.some(function (p) { return p.status === 'active' || p.status === 'matched'; });
+  var badge = anyActive ? 'bg-emerald-100 text-emerald-800 ring-emerald-200' : 'bg-amber-100 text-amber-800 ring-amber-200';
+  var committed = list.reduce(function (sum, p) { return sum + (Number(p.amountInr) || 0); }, 0);
+  var counts = { grant: 0, mentorship: 0, pilot: 0 };
+  list.forEach(function (p) { counts[p.pledgeType]++; });
+  var html = '<div class="rounded-xl px-3 py-2 ring-1 ' + badge + '">'
+    + '<div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">'
+    + '<p class="text-[11px] font-bold uppercase tracking-wide">' + (anyActive ? 'Backed' : 'Pending matching') + '</p>'
+    + '<p class="text-xs font-semibold">' + (committed > 0 ? fmtINR(committed) + ' committed' : 'In-kind pledges') + '</p></div>'
+    + '<div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px]">';
+  ['grant', 'mentorship', 'pilot'].forEach(function (type) {
+    if (counts[type] > 0) {
+      html += '<span class="font-medium opacity-80">' + PLEDGE_META[type].icon + ' ' + counts[type] + ' ' + PLEDGE_META[type].short
+        + (counts[type] === 1 ? '' : 's') + '</span>';
+    }
+  });
+  html += '<span class="opacity-70">· ' + list.length + ' pledge' + (list.length === 1 ? '' : 's') + '</span></div>';
+  if (mine.length > 0) {
+    html += '<p class="mt-1 text-[11px] font-semibold text-indigo-700">\uD83C\uDFF7\uFE0F Backed by you — '
+      + mine.map(function (p) { return PLEDGE_META[p.pledgeType].label; }).join(', ')
+      + ' (' + mine[0].status + ')</p>';
+  }
+  return html + '</div>';
+}
+
+function renderCatalog() {
+  var list = filtered();
+  var grid = document.getElementById('catalogGrid');
+  document.getElementById('showingLine').textContent = 'Showing ' + list.length + ' of ' + solutions.length;
+  document.getElementById('emptyState').classList.toggle('hidden', list.length > 0);
+  grid.classList.toggle('hidden', list.length === 0);
+
+  var html = '';
+  list.forEach(function (s, index) {
+    var meta = catMeta(s.complaint.categoryCode);
+    var mine = committedPledges(s).some(function (p) { return p.partnerId === state.accountId; });
+    html += '<article class="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">'
+      + '<div class="flex items-start justify-between gap-3">'
+      + '<div class="flex items-center gap-2">'
+      + '<span class="rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ' + meta.classes + '">' + s.complaint.categoryCode + '</span>'
+      + '<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Iteration ' + s.iteration + '</span>'
+      + '</div>'
+      + '<span class="text-[11px] text-slate-400">Approved ' + fmtDate(s.submittedAt) + '</span></div>'
+      + '<h3 class="mt-3 text-base font-bold leading-snug text-slate-900">' + esc(s.title) + '</h3>'
+      + '<p class="mt-0.5 text-xs text-slate-500">Complaint #' + s.complaint.id + ' — ' + esc(s.complaint.title) + '</p>'
+      + '<p class="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-600">' + esc(s.summary) + '</p>'
+      + '<div class="mt-3 flex flex-wrap gap-1.5">'
+      + s.techStack.slice(0, 8).map(function (t) { return '<span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">' + esc(t) + '</span>'; }).join('')
+      + (s.techStack.length > 8 ? '<span class="px-1 text-[11px] text-slate-400">+' + (s.techStack.length - 8) + ' more</span>' : '')
+      + '</div>'
+      + '<div class="mt-3 text-xs text-slate-500">\uD83D\uDCCD ' + esc(s.complaint.district) + ' · <span class="font-semibold text-slate-600">' + esc(s.team.teamName) + '</span>'
+      + (s.team.institutionName ? ' (' + esc(s.team.institutionName) + ')' : '') + '</div>'
+      + '<div class="mt-3">' + pledgeBadge(s) + '</div>'
+      + '<div class="mt-4 flex items-center gap-2">'
+      + '<button type="button" data-back="' + index + '" class="flex-1 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98]">'
+      + (mine ? 'Add another pledge' : 'Back this solution') + '</button>'
+      + (s.repositoryUrl ? '<a href="#" data-url="' + esc(s.repositoryUrl) + '" onclick="return false" class="repoLink rounded-full border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50" title="Review the prototype repository">Repo \u2197</a>' : '')
+      + (s.prototypeUrl ? '<a href="#" data-url="' + esc(s.prototypeUrl) + '" onclick="return false" class="demoLink rounded-full border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50" title="Open the live demo">Demo \u2197</a>' : '')
+      + '</div></article>';
+  });
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('button[data-back]').forEach(function (btn) {
+    btn.addEventListener('click', function () { openModal(solutions[Number(btn.getAttribute('data-back'))]); });
+  });
+  grid.querySelectorAll('a.repoLink, a.demoLink').forEach(function (a) {
+    a.addEventListener('click', function () {
+      var url = a.getAttribute('data-url');
+      showToast(a.classList.contains('repoLink') ? 'Repo \u2197 ' + url : 'Live demo \u2197 ' + url);
+    });
+  });
+}
+
+/* ---------- toast (stands in for the real modal-free feedback) ---------- */
+var toastEl = null;
+function showToast(message) {
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.className = 'fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white shadow-lg';
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = message;
+  toastEl.classList.remove('hidden');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(function () { toastEl.classList.add('hidden'); }, 2600);
+}
+
+/* ---------- modal ---------- */
+function openModal(solution) {
+  state.modalFor = solution;
+  state.pledgeType = 'grant';
+  document.getElementById('modalSolutionTitle').textContent = solution.title;
+  document.getElementById('modalSolutionTeam').textContent =
+    'by ' + solution.team.teamName + (solution.team.institutionName ? ' · ' + solution.team.institutionName : '');
+  document.getElementById('modalForm').classList.remove('hidden');
+  document.getElementById('modalSuccess').classList.add('hidden');
+  ['amountInput', 'titleInput', 'descInput', 'contactEmailInput', 'contactPhoneInput'].forEach(function (id) { document.getElementById(id).value = ''; });
+  hideError('amount'); hideError('title'); hideError('desc'); hideError('contactEmail'); hideError('contactPhone');
+  document.getElementById('serverError').classList.add('hidden');
+  updateDescCounter();
+  renderTypeButtons();
+  updateAmountState();
+  var el = document.getElementById('modal');
+  el.classList.remove('hidden');
+  el.classList.add('flex');
+}
+function closeModal(afterSuccess) {
+  document.getElementById('modal').classList.add('hidden');
+  document.getElementById('modal').classList.remove('flex');
+  if (afterSuccess && state.modalFor) {
+    var idx = solutions.indexOf(state.modalFor);
+    showToast('Pledge #' + state.modalFor._lastPledgeId + ' recorded — team & govt admins notified. Catalog refreshed.');
+    state.modalFor = null;
+    renderAll();
+  } else {
+    state.modalFor = null;
+  }
+}
+
+function renderTypeButtons() {
+  var html = '';
+  ['grant', 'mentorship', 'pilot'].forEach(function (type) {
+    var meta = PLEDGE_META[type];
+    var active = state.pledgeType === type;
+    html += '<button type="button" data-type="' + type + '" class="rounded-xl border px-2 py-2.5 text-center transition ' +
+      (active ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 bg-white hover:border-slate-300') + '">'
+      + '<span class="block text-lg">' + meta.icon + '</span>'
+      + '<span class="mt-0.5 block text-[11px] font-semibold leading-tight ' + (active ? 'text-indigo-800' : 'text-slate-600') + '">' + meta.label + '</span></button>';
+  });
+  document.getElementById('typeButtons').innerHTML = html;
+  document.getElementById('typeButtons').querySelectorAll('button[data-type]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.pledgeType = btn.getAttribute('data-type');
+      hideError('amount');
+      renderTypeButtons();
+      updateAmountState();
+    });
+  });
+  updateTypeHint();
+}
+function updateTypeHint() {
+  document.getElementById('typeHint').textContent = PLEDGE_META[state.pledgeType].hint;
+}
+function updateAmountState() {
+  var isGrant = state.pledgeType === 'grant';
+  var label = document.getElementById('amountLabel');
+  var input = document.getElementById('amountInput');
+  label.innerHTML = (isGrant ? 'Grant amount (\u20B9)' : 'In-kind value (\u20B9, optional)')
+    + (isGrant ? '<span class="ml-0.5 text-rose-500">*</span>' : '');
+  document.getElementById('amountSub').textContent = isGrant ? 'required for grants' : 'approx. value accepted';
+  input.placeholder = isGrant ? 'e.g. 250000' : 'e.g. 50000 (optional)';
+}
+function updateDescCounter() {
+  var len = document.getElementById('descInput').value.trim().length;
+  var el = document.getElementById('descCounter');
+  el.textContent = len + '/20+ chars';
+  el.className = 'text-[11px] ' + (len >= 20 ? 'text-emerald-600' : 'text-slate-400');
+}
+function hideError(field) {
+  var el = document.getElementById(field + 'Error');
+  if (el) el.classList.add('hidden');
+}
+function showError(field, message) {
+  var el = document.getElementById(field + 'Error');
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function submitPledge() {
+  var errors = false;
+  hideError('amount'); hideError('title'); hideError('desc');
+  document.getElementById('serverError').classList.add('hidden');
+
+  var amountRaw = document.getElementById('amountInput').value.trim();
+  var amount = amountRaw === '' ? NaN : Number(amountRaw);
+  var isGrant = state.pledgeType === 'grant';
+
+  if (isGrant && (amountRaw === '' || !isFinite(amount) || amount <= 0)) {
+    showError('amount', 'Enter the committed grant amount in \u20B9 (must be a positive number).'); errors = true;
+  } else if (!isGrant && amountRaw !== '' && (!isFinite(amount) || amount <= 0)) {
+    showError('amount', 'In-kind value must be a positive number in \u20B9, or leave blank.'); errors = true;
+  }
+  if (document.getElementById('titleInput').value.trim().length === 0) {
+    showError('title', 'Add a short headline for this commitment.'); errors = true;
+  }
+  var desc = document.getElementById('descInput').value.trim();
+  if (desc.length < 20) {
+    showError('desc', 'Describe your commitment in at least 20 characters so the team and govt reviewers understand the offer.'); errors = true;
+  }
+  var email = document.getElementById('contactEmailInput').value.trim();
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+    showError('contactEmail', 'Provide a valid contact email — the team and govt reviewers use it to reach your organisation.'); errors = true;
+  }
+  var phone = document.getElementById('contactPhoneInput').value.trim();
+  if (phone !== '' && !/^[+0-9][0-9() -]{6,19}$/.test(phone)) {
+    showError('contactPhone', 'Enter a valid phone number (digits, spaces, +, - and parentheses only).'); errors = true;
+  }
+  if (errors) return;
+
+  /* simulate POST latency + a pre-existing duplicate guard */
+  var dup = state.modalFor.pledges.some(function (p) {
+    return p.partnerId === state.accountId && p.pledgeType === state.pledgeType;
+  });
+  if (dup) {
+    var el = document.getElementById('serverError');
+    el.textContent = 'You already have a ' + state.pledgeType + ' pledge on this solution. Update the existing pledge instead of duplicating it. (409)';
+    el.classList.remove('hidden');
+    return;
+  }
+
+  var btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Recording pledge…';
+  setTimeout(function () {
+    btn.disabled = false;
+    btn.textContent = 'Submit formal pledge';
+    var acct = account();
+    var pledgeId = nextPledgeId++;
+    state.modalFor.pledges.push({
+      id: pledgeId,
+      partnerId: state.accountId,
+      partnerLabel: acct.label,
+      partnerType: acct.type,
+      pledgeType: state.pledgeType,
+      amountInr: amountRaw === '' ? null : Math.round(amount * 100) / 100,
+      contactEmail: email,
+      contactPhone: phone === '' ? null : phone,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    });
+    state.modalFor._lastPledgeId = pledgeId;
+
+    var text = document.getElementById('successText');
+    text.innerHTML = '<span class="font-semibold text-slate-700">' + PLEDGE_META[state.pledgeType].icon + ' '
+      + PLEDGE_META[state.pledgeType].label
+      + (amountRaw !== '' ? ' of ' + fmtINR(Number(amountRaw)) : '') + '</span>'
+      + ' is now <span class="font-semibold text-amber-700">pending</span> government matching. The adopting team and govt admins have been notified.';
+    document.getElementById('successId').textContent = 'Pledge ID #' + pledgeId;
+    document.getElementById('modalForm').classList.add('hidden');
+    document.getElementById('modalSuccess').classList.remove('hidden');
+    renderAll(); /* keep metrics + cards behind the modal in sync */
+  }, 650);
+}
+
+/* ---------- filter wiring ---------- */
+function onFilterChange() {
+  state.search = document.getElementById('searchInput').value;
+  state.tech = document.getElementById('techSelect').value;
+  state.support = document.getElementById('supportSelect').value;
+  renderCatalog();
+}
+function clearFilters() {
+  state.category = 'all'; state.support = 'all'; state.tech = 'all'; state.search = '';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('supportSelect').value = 'all';
+  renderCategoryChips();
+  renderTechOptions();
+  renderCatalog();
+}
+function resetDemo() {
+  /* wipe every pledge except the two seed pledges (ids 1 & 2) */
+  solutions.forEach(function (s) {
+    s.pledges = s.pledges.filter(function (p) { return p.id === 1 || p.id === 2; });
+  });
+  nextPledgeId = 10;
+  clearFilters();
+  renderAll();
+  showToast('Demo reset — pledges by this account cleared.');
+}
+
+/* ---------- full render ---------- */
+function renderAll() {
+  renderMetrics();
+  renderCategoryChips();
+  renderTechOptions();
+  renderCatalog();
+}
+function onAccountChange() {
+  state.accountId = document.getElementById('accountSelect').value;
+  renderAll();
+  showToast('Signed in as ' + account().label + ' (' + account().type.toUpperCase() + ', pid=' + state.accountId + ').');
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('accountSelect').addEventListener('change', onAccountChange);
+  var modal = document.getElementById('modal');
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closeModal(false); /* backdrop dismiss */
+  });
+  renderAll();
+  showToast('Static demo — switch account (pid) or hit reset to explore. Open a card to pledge.');
+});
+</script>
+</body>
+</html>

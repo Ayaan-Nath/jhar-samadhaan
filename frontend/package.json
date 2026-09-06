@@ -1,0 +1,31 @@
+{
+  "name": "jhar-samadhan-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jhar Samadhan — SIH 26043 crowdsourcing-to-resolution PWA frontend (Next.js App Router + Tailwind CSS)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.3.4",
+    "pg": "^8.13.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

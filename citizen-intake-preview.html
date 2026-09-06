@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Citizen Intake — UI Preview (static demo)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .pop { animation: pop 0.18s ease-out; }
+</style>
+</head>
+<body class="bg-slate-100">
+<div id="app" class="flex h-screen flex-col bg-slate-100 mx-auto max-w-md sm:max-w-lg" style="height:100dvh">
+
+  <!-- ============ header ============ -->
+  <header class="border-b border-slate-200 bg-white px-4 pb-2 pt-3 shadow-sm shrink-0">
+    <div class="flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <h1 class="truncate text-base font-bold text-slate-900">Report an issue</h1>
+        <p class="text-xs text-slate-500" id="progressLine">Step 1 of 5 · <span id="geoPill" class="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600">📍 Detecting location…</span></p>
+      </div>
+    </div>
+    <div id="dots" class="mx-auto mt-2 flex w-full gap-1.5"></div>
+  </header>
+
+  <!-- demo-only controls (removed in the real component) -->
+  <div class="shrink-0 border-b border-indigo-100 bg-indigo-50 px-4 py-1.5 text-center text-[11px] font-medium text-indigo-700">
+    Static UI preview — no backend. Try: <button onclick="simulateDuplicate()" class="underline underline-offset-2 font-semibold">🔁 simulate duplicate match</button> · <button onclick="startOver()" class="underline underline-offset-2 font-semibold">↺ reset</button>
+  </div>
+
+  <!-- ============ transcript ============ -->
+  <main id="chat" class="flex-1 overflow-y-auto px-4 py-4 no-scrollbar">
+    <div id="messages" class="flex flex-col gap-3"></div>
+  </main>
+
+  <!-- ============ composer ============ -->
+  <footer id="composer" class="hidden shrink-0 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+    <div class="mx-auto w-full">
+      <div id="titleComposer" class="hidden">
+        <div class="flex items-end gap-2">
+          <input id="titleInput" type="text" maxlength="300" placeholder="e.g. Water pipeline leaking for a week"
+                 class="flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-200" />
+          <button onclick="sendTitle()" id="titleSend" disabled
+                  class="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-40">Send</button>
+        </div>
+        <p class="mt-1 pl-1 text-xs text-slate-400" id="titleHint"></p>
+      </div>
+      <div id="descComposer" class="hidden">
+        <div class="flex items-end gap-2">
+          <textarea id="descInput" rows="3" placeholder="Describe the issue…"
+                    class="max-h-40 flex-1 resize-none rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-200"></textarea>
+          <button onclick="sendDescription()" id="descSend" disabled
+                  class="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm disabled:opacity-40">Send</button>
+        </div>
+        <p class="mt-1 pl-1 text-xs text-slate-400" id="descHint"></p>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+ * Static UI preview of frontend/components/CitizenIntakeForm.tsx
+ * Same chat flow: title -> description -> category -> photos -> privacy
+ * -> review -> (duplicate notice | success). No network calls.
+ * ===================================================================== */
+
+var STEPS = [
+  { key: 'title',       question: 'What would you like to report? Give it a short title.' },
+  { key: 'description', question: "Tell me more about what's happening." },
+  { key: 'category',    question: 'Does it fit one of these categories?', optional: true },
+  { key: 'photos',      question: 'Add a photo as evidence?', optional: true },
+  { key: 'privacy',     question: 'Should this report show your name publicly?' },
+];
+
+var CATEGORIES = [
+  ['AGR', 'Agriculture & Farmer Welfare'], ['WAT', 'Water & Sanitation'],
+  ['HLT', 'Health & Wellness'],            ['EDU', 'Education & Skill Development'],
+  ['PWR', 'Energy & Electricity'],         ['INF', 'Roads & Infrastructure'],
+  ['SWM', 'Waste Management'],             ['OTH', 'Something else'],
+];
+
+var state = { answers: {}, pickedPhotos: [], duplicate: null, upvoteNote: null };
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function answered(key) { return state.answers[key] !== undefined; }
+function currentKey() {
+  for (var i = 0; i < STEPS.length; i++) if (!answered(STEPS[i].key)) return STEPS[i];
+  return null;
+}
+function answeredCount() { return STEPS.filter(function (s) { return answered(s.key); }).length; }
+
+function scrollDown() {
+  var chat = document.getElementById('chat');
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function bubble(from, html) {
+  var user = from === 'user';
+  return '<div class="pop flex w-full ' + (user ? 'justify-end' : 'justify-start') + '">' +
+    '<div class="flex max-w-[86%] items-end gap-2 ' + (user ? 'flex-row-reverse' : '') + '">' +
+      '<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm shadow-sm ' + (user ? 'bg-emerald-100' : 'bg-slate-200') + '">' + (user ? '🧑' : '🏛️') + '</span>' +
+      '<div class="rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ' + (user ? 'rounded-br-md bg-emerald-600 text-white' : 'rounded-bl-md border border-slate-200 bg-white text-slate-800') + '">' + html + '</div>' +
+    '</div></div>';
+}
+
+function answerContent(key) {
+  var v = state.answers[key];
+  if (key === 'category') {
+    if (!v) return '<p class="italic opacity-70">Skipped — left for AI triage</p>';
+    return '<p>' + esc(v.label) + '</p>';
+  }
+  if (key === 'photos') {
+    if (!v) return '<p class="italic opacity-70">Skipped — no photos</p>';
+    if (v.length === 0) return '<p class="italic opacity-70">No photos attached</p>';
+    var thumbs = v.map(function (p) {
+      return '<img src="' + p.url + '" alt="photo" class="h-16 w-16 rounded-lg object-cover ring-1 ring-black/10">';
+    }).join('');
+    return '<div><p>' + v.length + ' photo' + (v.length > 1 ? 's' : '') + ' · (demo, sizes not compressed)</p><div class="mt-2 flex flex-wrap gap-2">' + thumbs + '</div></div>';
+  }
+  if (key === 'privacy') {
+    return '<p>' + (v === 'anonymous' ? '🕶️ Anonymous' : '🙂 Public') + ' <span class="opacity-75">· ' + (v === 'anonymous' ? 'Anonymous' : 'Public') + '</span></p>';
+  }
+  return '<p class="whitespace-pre-wrap break-words">' + esc(v) + '</p>';
+}
+
+function controlsFor(key) {
+  if (key === 'category') {
+    var chips = CATEGORIES.map(function (c) {
+      return '<button onclick="chooseCategory(\'' + c[0] + '\')" class="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-800 shadow-sm hover:border-emerald-400 hover:bg-emerald-50 active:scale-[0.98]">' + esc(c[1]) + '</button>';
+    }).join('');
+    return '<div class="mt-3"><div class="grid grid-cols-2 gap-2">' + chips + '</div>' +
+      '<button onclick="skip(\'category\')" class="mt-3 text-sm font-medium text-slate-500 underline underline-offset-2">Skip for now →</button></div>';
+  }
+  if (key === 'photos') {
+    var picked = state.pickedPhotos.map(function (p, i) {
+      return '<div class="relative h-20 w-20 overflow-hidden rounded-xl ring-1 ring-black/10">' +
+        '<img src="' + p.url + '" class="h-full w-full object-cover" alt="selected">' +
+        '<button onclick="removePhoto(' + i + ')" class="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs font-bold text-white hover:bg-rose-600">✕</button></div>';
+    }).join('');
+    return '<div class="mt-3">' +
+      '<label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:border-emerald-400 hover:bg-emerald-50">📷 Attach a photo' +
+        '<input type="file" accept="image/*" multiple class="sr-only" onchange="pickPhotos(this)"></label>' +
+      (picked ? '<div class="mt-3 flex flex-wrap gap-2">' + picked + '</div>' : '') +
+      '<div class="mt-3 flex items-center gap-4 text-sm font-medium">' +
+        '<button onclick="photosDone()" class="rounded-full bg-emerald-600 px-4 py-1.5 text-white shadow-sm hover:bg-emerald-700" style="' + (state.pickedPhotos.length ? '' : 'display:none') + '">Done — send photos</button>' +
+        '<button onclick="skip(\'photos\')" class="text-slate-500 underline underline-offset-2">No photos →</button>' +
+      '</div></div>';
+  }
+  if (key === 'privacy') {
+    return '<div class="mt-3 grid gap-2">' +
+      '<button onclick="choosePrivacy(\'public\')" class="flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm hover:border-emerald-400 hover:bg-emerald-50 active:scale-[0.98]"><span class="text-2xl">🙂</span><span><span class="block text-sm font-semibold text-slate-800">Public</span><span class="block text-xs text-slate-500">Your name is visible with the report</span></span></button>' +
+      '<button onclick="choosePrivacy(\'anonymous\')" class="flex items-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm hover:border-emerald-400 hover:bg-emerald-50 active:scale-[0.98]"><span class="text-2xl">🕶️</span><span><span class="block text-sm font-semibold text-slate-800">Anonymous</span><span class="block text-xs text-slate-500">Your identity stays hidden from the public</span></span></button>' +
+    '</div>';
+  }
+  return '';
+}
+
+function renderReview() {
+  var rows = STEPS.map(function (s) {
+    var label = { title: 'Issue title', description: 'Description', category: 'Category', photos: 'Evidence', privacy: 'Privacy' }[s.key];
+    return '<div class="flex items-start justify-between gap-3 py-2">' +
+      '<div class="min-w-0 flex-1"><div class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</div>' +
+      '<div class="mt-0.5 truncate text-sm text-slate-800">' + answerContent(s.key) + '</div></div>' +
+      '<button onclick="editAnswer(\'' + s.key + '\')" class="shrink-0 text-xs font-semibold text-emerald-700 underline underline-offset-2">Edit</button></div>';
+  }).join('');
+  return '<div class="pop rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">' +
+    '<h2 class="text-sm font-bold text-slate-900">Review &amp; submit</h2>' +
+    '<p class="mt-0.5 text-xs text-slate-500">Location: <span id="reviewGeo">auto-detected or unavailable in preview</span></p>' +
+    '<dl class="mt-3 divide-y divide-slate-100">' + rows + '</dl>' +
+    '<button onclick="submitReport()" class="mt-4 w-full rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.99]">Submit report →</button>' +
+  '</div>';
+}
+
+function renderDuplicate() {
+  var d = state.duplicate;
+  return '<div class="pop rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm" role="status">' +
+    '<p class="text-sm font-semibold text-amber-900">A similar issue has already been reported nearby. Would you like to upvote it instead?</p>' +
+    '<p class="mt-1 text-xs text-amber-700">Your report was stored and linked to report #' + d.parentComplaintId + ' (' + Math.round(d.similarity * 100) + '% similar) — either way it will be resolved together with the earlier one.</p>' +
+    '<div class="mt-3 flex flex-col gap-2 sm:flex-row">' +
+      '<button onclick="duplicateDecision(\'upvote\')" class="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-600">👍 Yes, upvote the earlier report</button>' +
+      '<button onclick="duplicateDecision(\'keep\')" class="rounded-full border border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100">No, keep my report</button>' +
+    '</div></div>';
+}
+
+function successCard() {
+  var note = state.upvoteNote ? '<p class="mt-1 text-xs font-medium text-emerald-800">' + esc(state.upvoteNote) + '</p>' : '';
+  return '<div class="pop rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center">' +
+    '<p class="text-3xl">🎉</p><h2 class="mt-2 text-base font-bold text-emerald-900">Report submitted!</h2>' +
+    note +
+    '<p class="mt-1 text-sm text-emerald-800">You\'ll get an email alert at every step of the resolution.</p>' +
+    '<button onclick="startOver()" class="mt-4 rounded-full border border-emerald-300 bg-white px-5 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">Report another issue</button>' +
+  '</div>';
+}
+
+function render() {
+  var cur = currentKey();
+  var html = bubble('assistant', '<p>Namaste! 🙏 Tell us what\'s happening in your area and we\'ll route it to the right department. This takes less than a minute.</p>');
+
+  STEPS.forEach(function (s) {
+    if (!answered(s.key)) return;
+    html += bubble('assistant', '<p>' + esc(s.question) + '</p>');
+    html += bubble('user', answerContent(s.key));
+  });
+
+  if (state.duplicate) {
+    html += renderDuplicate();
+  } else if (cur) {
+    html += bubble('assistant', '<div><p>' + esc(cur.question) + '</p><p class="mt-1 text-xs text-slate-400">' + hintFor(cur.key) + '</p>' + controlsFor(cur.key) + '</div>');
+  } else {
+    html += renderReview();
+  }
+
+  document.getElementById('messages').innerHTML = html;
+  updateHeader(cur);
+  scrollDown();
+}
+
+function hintFor(key) {
+  return { title: '5–300 characters', description: 'What did you see, where exactly, and since when?', category: 'Optional — we can also figure it out ourselves.', photos: 'Up to 4 photos, compressed to WebP under 500 KB in the real app.', privacy: '' }[key];
+}
+
+function updateHeader(cur) {
+  var total = STEPS.length;
+  var done = answeredCount();
+  document.getElementById('progressLine').innerHTML = 'Step ' + Math.min(done + 1, total) + ' of ' + total + ' · <span id="geoPill"></span>';
+  installGeoPill();
+  var dots = STEPS.map(function (s) {
+    var cls = answered(s.key) ? 'bg-emerald-500' : (cur && s.key === cur.key ? 'bg-emerald-300' : 'bg-slate-200');
+    return '<span class="h-1 flex-1 rounded-full ' + cls + '"></span>';
+  }).join('');
+  document.getElementById('dots').innerHTML = dots;
+
+  // composer visibility
+  var showTitle = cur && cur.key === 'title';
+  var showDesc = cur && cur.key === 'description';
+  document.getElementById('composer').classList.toggle('hidden', !showTitle && !showDesc);
+  document.getElementById('titleComposer').classList.toggle('hidden', !showTitle);
+  document.getElementById('descComposer').classList.toggle('hidden', !showDesc);
+}
+
+/* ---- step answers ---- */
+function sendTitle() {
+  var v = document.getElementById('titleInput').value.trim();
+  if (v.length < 5 || v.length > 300) return;
+  state.answers.title = v;
+  document.getElementById('titleInput').value = '';
+  render();
+}
+function sendDescription() {
+  var v = document.getElementById('descInput').value.trim();
+  if (v.length < 10) return;
+  state.answers.description = v;
+  document.getElementById('descInput').value = '';
+  render();
+}
+window.chooseCategory = function (code) {
+  var cat = CATEGORIES.filter(function (c) { return c[0] === code; })[0];
+  state.answers.category = { code: cat[0], label: cat[1] };
+  render();
+};
+window.skip = function (key) { state.answers[key] = null; if (key === 'photos') state.pickedPhotos = []; render(); };
+window.choosePrivacy = function (p) { state.answers.privacy = p; render(); };
+window.pickPhotos = function (input) {
+  Array.prototype.forEach.call(input.files, function (file) {
+    if (state.pickedPhotos.length >= 4) return;
+    state.pickedPhotos.push({ name: file.name, url: URL.createObjectURL(file) });
+  });
+  input.value = '';
+  render();
+};
+window.removePhoto = function (i) { URL.revokeObjectURL(state.pickedPhotos[i].url); state.pickedPhotos.splice(i, 1); render(); };
+window.photosDone = function () { if (state.pickedPhotos.length) { state.answers.photos = state.pickedPhotos.slice(); render(); } };
+window.editAnswer = function (key) { delete state.answers[key]; render(); };
+
+/* ---- submit + duplicate demo ---- */
+window.submitReport = function () { renderSuccess(); };
+window.simulateDuplicate = function () {
+  if (state.duplicate) return;
+  state.duplicate = { parentComplaintId: 1042, similarity: 0.91 };
+  render();
+};
+window.duplicateDecision = function (choice) {
+  if (choice === 'upvote') state.upvoteNote = 'Thanks! Your upvote was recorded on report #' + state.duplicate.parentComplaintId + '.';
+  else state.upvoteNote = 'Your report was linked to earlier report #' + state.duplicate.parentComplaintId + ' — both will be resolved together.';
+  state.duplicate = null;
+  renderSuccess();
+};
+function renderSuccess() {
+  // Replace the transcript with the intro + the success card (upvote note included).
+  document.getElementById('messages').innerHTML = bubble('assistant', '<p>Namaste! 🙏 Tell us what\'s happening in your area and we\'ll route it to the right department. This takes less than a minute.</p>') + successCard();
+  document.getElementById('composer').classList.add('hidden');
+  document.getElementById('dots').innerHTML = STEPS.map(function () { return '<span class="h-1 flex-1 rounded-full bg-emerald-500"></span>'; }).join('');
+  document.getElementById('progressLine').innerHTML = 'Complete · <span id="geoPill"></span>';
+  installGeoPill();
+  scrollDown();
+}
+
+window.startOver = function () {
+  state = { answers: {}, pickedPhotos: [], duplicate: null, upvoteNote: null };
+  render();
+};
+
+/* ---- geolocation (real attempt; may be blocked/unsupported) ---- */
+var geoState = { text: '📍 Detecting location…', cls: ['bg-slate-200', 'text-slate-600'] };
+function installGeoPill() {
+  var el = document.getElementById('geoPill');
+  if (!el) return;
+  el.className = 'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ' + geoState.cls.join(' ');
+  el.textContent = geoState.text;
+}
+
+/* ---- live input validation + header wiring ---- */
+document.getElementById('titleInput').addEventListener('input', function () {
+  var len = this.value.trim().length;
+  var ok = len >= 5 && len <= 300;
+  document.getElementById('titleSend').disabled = !ok;
+  document.getElementById('titleHint').textContent = len + '/300' + (len > 0 && len < 5 ? ' · at least 5 characters' : '');
+});
+document.getElementById('titleInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendTitle(); });
+document.getElementById('descInput').addEventListener('input', function () {
+  var len = this.value.trim().length;
+  var ok = len >= 10;
+  document.getElementById('descSend').disabled = !ok;
+  document.getElementById('descHint').textContent = len > 0 && len < 10 ? 'at least 10 characters' : 'Press Send when you are done.';
+});
+
+/* geo: try silently, mirror the component's states */
+if ('geolocation' in navigator) {
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      geoState = { text: '📍 Location captured · ' + pos.coords.latitude.toFixed(4) + ', ' + pos.coords.longitude.toFixed(4), cls: ['bg-emerald-100', 'text-emerald-800'] };
+      installGeoPill();
+    },
+    function (err) {
+      geoState = {
+        text: err.code === err.PERMISSION_DENIED ? '📍 Location blocked' : '📍 Location unavailable',
+        cls: ['bg-amber-100', 'text-amber-800'],
+      };
+      installGeoPill();
+    }
+  );
+} else {
+  geoState = { text: '📍 Location unavailable', cls: ['bg-slate-200', 'text-slate-600'] };
+  installGeoPill();
+}
+
+render();
+</script>
+</body>
+</html>
